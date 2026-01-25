@@ -1,6 +1,9 @@
 package inlines
 
-case class Person(name: String, age: Int, programmer: Boolean)
+case class Person(name: String, age: Int, programmer: Boolean) derives Show
+// compiler will look for a method derived in the companion object of show
+// such as it returns a Show[Person]
+// Will give us a GIVEN Show[Person]
 
 enum Permissions:
   case READ, DELETE, WRITE
@@ -28,33 +31,10 @@ object Mirrors {
   // we can get a list of all cases
   val allCases = constValueTuple[permissionsMirror.MirroredElemLabels]
 
-  // autoderivation for a serialization type class
-  // showTuple[(String, Int, Boolean), ("Name", "age", "programmer")]("Alex", 31, true)
-  // => ["name: Alex", "age: 31", "programmer:true"]
-  inline def showTuple[E <: Tuple, L <: Tuple](elements: E): List[String] =
-    inline (elements, erasedValue[L]) match
-      case (EmptyTuple, EmptyTuple) => List()
-      case (el: (eh *: et), lab: (lh *: lt)) =>
-        val (h *: t) = el
-        val label = constValue[lh]
-        val value = summonInline[Show[eh]].show(h)
-
-        ("" + label + ": " + value) :: showTuple[et, lt](t)
-
-  inline def showCC[A <: Product](using m: Mirror.ProductOf[A]): Show[A] =
-    new Show[A]:
-      // show(Person("Alex", 31, true))
-      override def show(a: A): String =
-        val valueTuple = Tuple.fromProductTyped[A](a) // ("Alex", 31, true)
-        val fieldRep =
-          showTuple[m.MirroredElemTypes, m.MirroredElemLabels](
-            valueTuple
-          ) // ["name:Alex", "age:31", "programmer:true"]
-        fieldRep.mkString("{", ", ", "}")
-
   @main def exMirrors =
     val yoda = Person("Yoda", 800, false)
-    val showPerson = showCC[Person]
+    val showPerson = Show.derived[Person] // explicit call
+    val showPerson_v2 = summon[Show[Person]]
     val yodaJson = showPerson.show(yoda)
     println(yodaJson)
 }
